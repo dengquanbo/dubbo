@@ -12,4 +12,7 @@
 
     <dubbo:reference id="demoService" check="true" interface="cn.dqb.demo01.DemoService"/>
 
+    <!--直联提供者-->
+    <!--<dubbo:reference id="demoService" check="true" interface="cn.dqb.demo01.DemoService" url="zookeeper://127.0.0.1:2181"/>-->
+
 </beans>

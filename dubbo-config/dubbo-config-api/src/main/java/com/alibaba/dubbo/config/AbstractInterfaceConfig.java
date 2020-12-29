@@ -228,9 +228,9 @@ public abstract class AbstractInterfaceConfig extends AbstractMethodConfig {
                     // 解析地址，创建 Dubbo URL 数组。（数组大小可以为一）
                     List<URL> urls = UrlUtils.parseURLs(address, map);
 
-                    // 循环 `url` ，设置 "registry" 和 "protocol" 属性。
+                    // 循环 url，设置 "registry" 和 "protocol" 属性。
                     for (URL url : urls) {
-                        // 设置 `registry=${protocol}` 和 `protocol=registry` 到 URL
+                        // 设置 registry=${protocol}和 protocol=registry到 URL
                         url = url.addParameter(Constants.REGISTRY_KEY, url.getProtocol());
                         url = url.setProtocol(Constants.REGISTRY_PROTOCOL);
                         // 添加到结果

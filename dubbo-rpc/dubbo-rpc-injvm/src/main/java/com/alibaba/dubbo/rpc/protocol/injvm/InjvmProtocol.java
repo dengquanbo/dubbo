@@ -108,13 +108,13 @@ public class InjvmProtocol extends AbstractProtocol implements Protocol {
          *
          * 推荐 <dubbo:service scope="local" />
          * <p>
-         * 不推荐使用，准备废弃 <dubbo:service injvm="true" />
+         * 不推荐使用，准备废弃 <dubbo:reference injvm="true" />
          *
          */
         final boolean isJvmRefer;
-        // 从 url 中获取 'scope' 属性
+        // 从 url 中获取 scope 属性
         String scope = url.getParameter(Constants.SCOPE_KEY);
-        // 当 `protocol = injvm` 时，本身已经是jvm协议了，走正常流程就是了.
+        // 当  protocol = injvm  时，本身已经是jvm协议了，走正常流程就是了.
         if (Constants.LOCAL_PROTOCOL.toString().equals(url.getProtocol())) {
             isJvmRefer = false;
         }
@@ -122,11 +122,11 @@ public class InjvmProtocol extends AbstractProtocol implements Protocol {
         else if (Constants.SCOPE_LOCAL.equals(scope) || (url.getParameter("injvm", false))) {
             isJvmRefer = true;
         }
-        // 当 `scope = remote` 时，远程引用
+        // 当  scope = remote  时，远程引用
         else if (Constants.SCOPE_REMOTE.equals(scope)) {
             isJvmRefer = false;
         }
-        // 当 `generic = true` 时，即使用泛化调用，远程引用。
+        // 当  generic = true  时，即使用泛化调用，远程引用。
         else if (url.getParameter(Constants.GENERIC_KEY, false)) {
             //泛化调用不走本地
             isJvmRefer = false;

@@ -188,6 +188,7 @@ public class ReferenceConfig<T> extends AbstractReferenceConfig {
         if (getGeneric() == null && getConsumer() != null) {
             setGeneric(getConsumer().getGeneric());
         }
+        // 是否是泛化调用
         if (ProtocolUtils.isGeneric(getGeneric())) {
             interfaceClass = GenericService.class;
         } else {
@@ -366,11 +367,11 @@ public class ReferenceConfig<T> extends AbstractReferenceConfig {
         final boolean isJvmRefer;
         // injvm 属性为空，不通过该属性判断
         if (isInjvm() == null) {
-            // 文档：http://dubbo.apache.org/zh-cn/docs/user/demos/explicit-target.html
+            // 直连服务提供者，文档：https://dubbo.apache.org/zh/docs/v2.7/user/examples/local-call/#m-zhdocsv27userexampleslocal-call
             if (url != null && url.length() > 0) { //指定URL的情况下，不做本地引用
                 isJvmRefer = false;
             } else if (InjvmProtocol.getInjvmProtocol().isInjvmRefer(tmpUrl)) {
-                //默认情况下如果本地有服务暴露，则引用本地服务.
+                // 默认情况下如果本地有服务暴露，则引用本地服务.
                 isJvmRefer = true;
             } else {
                 // 默认不是
@@ -392,24 +393,24 @@ public class ReferenceConfig<T> extends AbstractReferenceConfig {
                 logger.info("Using injvm service " + interfaceClass.getName());
             }
         } else {
-            // 正常流程，一般为远程引用
+            // 正常流程，一般为远程引用，分为两种情况
             if (url != null && url.length() > 0) { // 用户指定URL，指定的URL可能是对点对直连地址，也可能是注册中心URL
                 // 拆分地址成数组，使用 ";" 分隔。
                 String[] us = Constants.SEMICOLON_SPLIT_PATTERN.split(url);
                 if (us != null && us.length > 0) {
-                    // 循环数组，添加到 `urls` 中。
+                    // 循环数组，添加到 urls 中。
                     for (String u : us) {
                         // 创建 URL 对象
                         URL url = URL.valueOf(u);
-                        // 设置默认路径
+                        // 路径属性 url.path 未设置时，缺省使用接口全名 interfaceName
                         if (url.getPath() == null || url.getPath().length() == 0) {
                             url = url.setPath(interfaceName);
                         }
-                        // 注册中心的地址，带上服务引用的配置参数
+                        // 若 url.protocol = registry 时，注册中心的地址，在参数 url.parameters.refer 上，设置上服务引用的配置参数集合 map
                         if (Constants.REGISTRY_PROTOCOL.equals(url.getProtocol())) {
                             urls.add(url.addParameterAndEncoded(Constants.REFER_KEY, StringUtils.toQueryString(map)));
                         } else {
-                            // 服务提供者的地址
+                            // 如果是点对点，服务提供者的地址
                             urls.add(ClusterUtils.mergeUrl(url, map));
                         }
                     }
@@ -417,16 +418,17 @@ public class ReferenceConfig<T> extends AbstractReferenceConfig {
             } else { // 通过注册中心配置拼装URL
                 List<URL> us = loadRegistries(false);
                 if (us != null && us.size() > 0) {
-                    // 循环数组，添加到 `urls` 中
+                    // 循环数组，添加到 urls 中
                     for (URL u : us) {
                         // 加载监控中心 URL
                         URL monitorUrl = loadMonitor(u);
 
-                        // 服务引用配置对象 `map`，带上监控中心的 URL
+                        // 服务引用配置对象 map，带上监控中心的 URL
                         if (monitorUrl != null) {
                             map.put(Constants.MONITOR_KEY, URL.encode(monitorUrl.toFullString()));
                         }
                         // 注册中心的地址，带上服务引用的配置参数
+                        // 将服务引用配置对象参数集合 map ，作为 "refer" 参数添加到注册中心的 URL 中，并且需要编码。通过这样的方式，注册中心的 URL 中，包含了服务引用的配置。
                         urls.add(u.addParameterAndEncoded(Constants.REFER_KEY, StringUtils.toQueryString(map)));
                     }
                 }
@@ -437,25 +439,28 @@ public class ReferenceConfig<T> extends AbstractReferenceConfig {
                 }
             }
 
-            // 单 `urls` 时，引用服务，返回 Invoker 对象
+            // 单 urls 时，引用服务，直接转换为 Invoker 对象
             if (urls.size() == 1) {
                 // 引用服务
                 invoker = refprotocol.refer(interfaceClass, urls.get(0));
             } else {
                 List<Invoker<?>> invokers = new ArrayList<Invoker<?>>();
                 URL registryURL = null;
-                // 循环 `urls` ，引用服务，返回 Invoker 对象
+                // 多个 url 循环 urls，挨个转换为 Invoker 对象
                 for (URL url : urls) {
+                    // 引用服务
                     invokers.add(refprotocol.refer(interfaceClass, url));
+                    // 用最后一个注册中心的地址
                     if (Constants.REGISTRY_PROTOCOL.equals(url.getProtocol())) {
-                        registryURL = url; // 用了最后一个registry url
+                        registryURL = url;
                     }
                 }
                 if (registryURL != null) { // 有注册中心协议的URL
-                    // 对有注册中心的Cluster 只用 AvailableCluster
+                    // 对有注册中心的Cluster 用 AvailableCluster
                     URL u = registryURL.addParameter(Constants.CLUSTER_KEY, AvailableCluster.NAME);
+                    // 创建 StaticDirectory 实例，并由 Cluster 对多个 Invoker 进行合并，只暴露一个 invoker 便于使用
                     invoker = cluster.join(new StaticDirectory(u, invokers));
-                } else { // 不是 注册中心的URL
+                } else { // 没哟一个注册中心的URL
                     invoker = cluster.join(new StaticDirectory(invokers));
                 }
             }
@@ -468,7 +473,7 @@ public class ReferenceConfig<T> extends AbstractReferenceConfig {
         if (c == null) {
             c = true; // default true
         }
-        // 启动时检查
+        // 启动时检查提供者
         if (c && !invoker.isAvailable()) {
             throw new IllegalStateException("Failed to check the status of the service " + interfaceName + ". No " +
                     "provider available for the service " + (group == null ? "" : group + "/") + interfaceName + (version == null ? "" : ":" + version) + " from the url " + invoker.getUrl() + " to the consumer " + NetUtils.getLocalHost() + " use dubbo version " + Version.getVersion());

@@ -1,12 +1,12 @@
 /*
  * Copyright 1999-2011 Alibaba Group.
- *  
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- *  
+ *
  *      http://www.apache.org/licenses/LICENSE-2.0
- *  
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -25,21 +25,24 @@ import com.alibaba.dubbo.rpc.cluster.Router;
 
 /**
  * StaticDirectory
- * 
+ *
  * @author william.liangf
  */
 public class StaticDirectory<T> extends AbstractDirectory<T> {
-    
+
+    /**
+     * Invoker 列表
+     */
     private final List<Invoker<T>> invokers;
-    
-    public StaticDirectory(List<Invoker<T>> invokers){
+
+    public StaticDirectory(List<Invoker<T>> invokers) {
         this(null, invokers, null);
     }
-    
-    public StaticDirectory(List<Invoker<T>> invokers, List<Router> routers){
+
+    public StaticDirectory(List<Invoker<T>> invokers, List<Router> routers) {
         this(null, invokers, routers);
     }
-    
+
     public StaticDirectory(URL url, List<Invoker<T>> invokers) {
         this(url, invokers, null);
     }
@@ -52,13 +55,18 @@ public class StaticDirectory<T> extends AbstractDirectory<T> {
     }
 
     public Class<T> getInterface() {
+        // 获取接口类
         return invokers.get(0).getInterface();
     }
 
+    /**
+     * 检测服务目录是否可用
+     */
     public boolean isAvailable() {
         if (isDestroyed()) {
             return false;
         }
+        // 检测的规则为遍历每一个 invoker，有一个可用则整个 Directory 可用
         for (Invoker<T> invoker : invokers) {
             if (invoker.isAvailable()) {
                 return true;
@@ -68,16 +76,19 @@ public class StaticDirectory<T> extends AbstractDirectory<T> {
     }
 
     public void destroy() {
-        if(isDestroyed()) {
+        if (isDestroyed()) {
             return;
         }
+        // 调用父类销毁逻辑
         super.destroy();
+
+        // 遍历 Invoker 列表，并执行相应的销毁逻辑
         for (Invoker<T> invoker : invokers) {
             invoker.destroy();
         }
         invokers.clear();
     }
-    
+
     @Override
     protected List<Invoker<T>> doList(Invocation invocation) throws RpcException {
 

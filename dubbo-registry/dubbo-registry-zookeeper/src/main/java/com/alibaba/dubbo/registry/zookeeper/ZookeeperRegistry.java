@@ -200,7 +200,7 @@ public class ZookeeperRegistry extends FailbackRegistry {
             } else {
                 // 子节点数据数组
                 List<URL> urls = new ArrayList<URL>();
-                // 循环分类数组
+                // 循环分类数组，如 providers、configurations,routers目录
                 for (String path : toCategoriesPath(url)) {
                     // 获得 url 对应的监听器集合
                     ConcurrentMap<NotifyListener, ChildListener> listeners = zkListeners.get(url);
@@ -210,21 +210,26 @@ public class ZookeeperRegistry extends FailbackRegistry {
                     }
                     // 获得 ChildListener 对象
                     ChildListener zkListener = listeners.get(listener);
-                    if (zkListener == null) {
+                    if (zkListener == null) { // 不存在 ChildListener 对象，进行创建 ChildListener 对象
                         listeners.putIfAbsent(listener, new ChildListener() {
                             public void childChanged(String parentPath, List<String> currentChilds) {
+                                // 变更时，调用 #notify(...) 方法，回调 NotifyListener
                                 ZookeeperRegistry.this.notify(url, listener, toUrlsWithEmpty(url, parentPath,
                                         currentChilds));
                             }
                         });
                         zkListener = listeners.get(listener);
                     }
+                    // 创建 Type 节点。该节点为持久节点。如：/dubbo/cn.dqb.demo01.DemoService/providers
                     zkClient.create(path, false);
+
+                    // 向 Zookeeper ，PATH 节点，发起订阅
                     List<String> children = zkClient.addChildListener(path, zkListener);
                     if (children != null) {
                         urls.addAll(toUrlsWithEmpty(url, path, children));
                     }
                 }
+                // 首次全量数据获取完成时，调用 notify 方法，回调 NotifyListener
                 notify(url, listener, urls);
             }
         } catch (Throwable e) {
